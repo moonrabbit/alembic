@@ -632,9 +632,9 @@ class Operations(object):
          :class:`sqlalchemy.schema.Table` object created for the command.
 
         """
-        self.impl.create_table(
-            self._table(name, *columns, **kw)
-        )
+        new_table = self._table(name, *columns, **kw)
+        self.impl.create_table(new_table)
+        return new_table
 
     def drop_table(self, name, **kw):
         """Issue a "drop table" instruction using the current
