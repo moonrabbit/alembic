@@ -1,11 +1,28 @@
-from sqlalchemy import schema as sa_schema, types as sqltypes
+from sqlalchemy import schema as sa_schema, types as sqltypes, sql
 import logging
+from .. import compat
 import re
-
-
-from ..compat import string_types, get_index_column_names
+from ..compat import string_types
 
 log = logging.getLogger(__name__)
+
+def _render_potential_expr(value, autogen_context):
+    if isinstance(value, sql.ClauseElement):
+        if compat.sqla_08:
+            compile_kw = dict(compile_kwargs={'literal_binds': True})
+        else:
+            compile_kw = {}
+
+        return "%(prefix)stext(%(sql)r)" % {
+            "prefix": _sqlalchemy_autogenerate_prefix(autogen_context),
+            "sql": str(
+                    value.compile(dialect=autogen_context['dialect'],
+                    **compile_kw)
+                )
+        }
+
+    else:
+        return repr(value)
 
 def _add_table(table, autogen_context):
     text = "%(prefix)screate_table(%(tablename)r,\n%(args)s" % {
@@ -44,14 +61,17 @@ def _add_index(index, autogen_context):
     Generate Alembic operations for the CREATE INDEX of an
     :class:`~sqlalchemy.schema.Index` instance.
     """
+    from .compare import _get_index_column_names
+
     text = "op.create_index('%(name)s', '%(table)s', %(columns)s, unique=%(unique)r%(schema)s%(kwargs)s)" % {
         'name': index.name,
         'table': index.table,
-        'columns': get_index_column_names(index),
+        'columns': _get_index_column_names(index),
         'unique': index.unique or False,
         'schema': (", schema='%s'" % index.table.schema) if index.table.schema else '',
         'kwargs': (', '+', '.join(
-            ["%s='%s'" % (key, val) for key, val in index.kwargs.items()]))\
+            ["%s=%s" % (key, _render_potential_expr(val, autogen_context))
+                for key, val in index.kwargs.items()]))\
             if len(index.kwargs) else ''
     }
     return text

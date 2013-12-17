@@ -1,8 +1,12 @@
+import io
 import sys
 from sqlalchemy import __version__ as sa_version
 
 if sys.version_info < (2, 6):
     raise NotImplementedError("Python 2.6 or greater is required.")
+
+sqla_08 = sa_version >= '0.8.0'
+sqla_09 = sa_version >= '0.9.0'
 
 py2k = sys.version_info < (3, 0)
 py3k = sys.version_info >= (3, 0)
@@ -64,13 +68,6 @@ except AttributeError:
     def exec_(func_text, globals_, lcl):
         exec('exec func_text in globals_, lcl')
 
-if sa_version >= '0.8.0':
-    def get_index_column_names(idx):
-        return [exp.name for exp in idx.expressions]
-else:
-    def get_index_column_names(idx):
-        return [col.name for col in idx.columns]
-
 ################################################
 # cross-compatible metaclass implementation
 # Copyright (c) 2010-2012 Benjamin Peterson
@@ -78,3 +75,49 @@ def with_metaclass(meta, base=object):
     """Create a base class with a metaclass."""
     return meta("%sBase" % meta.__name__, (base,), {})
 ################################################
+
+
+# produce a wrapper that allows encoded text to stream
+# into a given buffer, but doesn't close it.
+# not sure of a more idiomatic approach to this.
+class EncodedIO(io.TextIOWrapper):
+    def close(self):
+        pass
+
+if py2k:
+    # in Py2K, the io.* package is awkward because it does not
+    # easily wrap the file type (e.g. sys.stdout) and I can't
+    # figure out at all how to wrap StringIO.StringIO (used by nosetests)
+    # and also might be user specified too.  So create a full
+    # adapter.
+
+    class ActLikePy3kIO(object):
+        """Produce an object capable of wrapping either
+        sys.stdout (e.g. file) *or* StringIO.StringIO().
+
+        """
+        def _false(self):
+            return False
+
+        def _true(self):
+            return True
+
+        readable = seekable = _false
+        writable = _true
+        closed = False
+
+        def __init__(self, file_):
+            self.file_ = file_
+
+        def write(self, text):
+            return self.file_.write(text)
+
+        def flush(self):
+            return self.file_.flush()
+
+    class EncodedIO(EncodedIO):
+        def __init__(self, file_, encoding):
+            super(EncodedIO, self).__init__(
+                    ActLikePy3kIO(file_), encoding=encoding)
+
+

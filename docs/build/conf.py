@@ -31,13 +31,20 @@ import alembic
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx',
-                'ext.changelog']
+                'changelog']
 
 # tags to sort on inside of sections
 changelog_sections = ["feature", "bug", "moved", "changed", "removed"]
 
 changelog_render_ticket = "https://bitbucket.org/zzzeek/alembic/issue/%s/"
 changelog_render_pullreq = "https://bitbucket.org/zzzeek/alembic/pull-request/%s"
+
+changelog_render_pullreq = {
+    "bitbucket": "https://bitbucket.org/zzzeek/alembic/pull-request/%s",
+    "default": "https://bitbucket.org/zzzeek/alembic/pull-request/%s",
+    "github": "https://github.com/zzzeek/alembic/pull/%s",
+}
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -23,11 +23,13 @@ class FullEnvironmentTests(TestCase):
     def teardown_class(cls):
         clear_staging_env()
 
-    def test_begin_comit(self):
+    def test_begin_commit(self):
         with capture_context_buffer(transactional_ddl=True) as buf:
             command.upgrade(self.cfg, self.a, sql=True)
         assert "BEGIN TRANSACTION;" in buf.getvalue()
-        assert "COMMIT;" in buf.getvalue()
+
+        # ensure ends in COMMIT; GO
+        assert [x for x in buf.getvalue().splitlines() if x][-2:] == ['COMMIT;', 'GO']
 
     def test_batch_separator_default(self):
         with capture_context_buffer() as buf:
@@ -84,7 +86,7 @@ class OpTest(TestCase):
         context = op_fixture('mssql')
         op.drop_index('my_idx', 'my_table')
         # TODO: annoying that SQLA escapes unconditionally
-        context.assert_contains("DROP INDEX [my_table].my_idx")
+        context.assert_contains("DROP INDEX my_idx ON my_table")
 
     def test_drop_column_w_default(self):
         context = op_fixture('mssql')
@@ -107,6 +109,12 @@ class OpTest(TestCase):
         context.assert_(
             "ALTER TABLE t ALTER COLUMN c INTEGER NULL"
         )
+
+    def test_drop_column_w_fk(self):
+        context = op_fixture('mssql')
+        op.drop_column('t1', 'c1', mssql_drop_foreign_key=True)
+        context.assert_contains("exec('alter table t1 drop constraint ' + @const_name)")
+        context.assert_contains("ALTER TABLE t1 DROP COLUMN c1")
 
     def test_alter_column_not_nullable_w_existing_type(self):
         context = op_fixture('mssql')
@@ -176,4 +184,3 @@ class OpTest(TestCase):
     #    context.assert_(
     #        "EXEC sp_rename 'y.t.c', 'x', 'COLUMN'"
     #    )
-
